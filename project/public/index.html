@@ -368,7 +368,7 @@
             <h2 class="text-xl font-black text-yellow-300 mb-1">메가 타워 완주자가 나왔습니다!</h2>
             <p id="global-ranking-winner" class="text-sm text-gray-300 mb-4"></p>
             <div id="global-ranking-list" class="text-left space-y-1.5 mb-5 max-h-64 overflow-y-auto"></div>
-            <p class="text-xs text-gray-400 mb-3"><span id="global-ranking-countdown">8</span>초 후 모두 새 게임으로 시작합니다.</p>
+            <p class="text-xs text-gray-400 mb-3"><span id="global-ranking-countdown">120</span>초 후 모두 새 게임으로 시작합니다.</p>
             <button onclick="startNewGlobalRound()" class="roblox-btn bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-black font-extrabold px-6 py-3 rounded-2xl text-sm w-full">
                 <i class="fa-solid fa-rotate-right mr-1.5"></i> 지금 바로 새 게임 시작
             </button>
@@ -2367,7 +2367,7 @@
             document.getElementById('obby-finish-modal').classList.add('hidden');
             modal.classList.remove('hidden');
 
-            let countdown = 8;
+            let countdown = 120;
             const countdownEl = document.getElementById('global-ranking-countdown');
             if (countdownEl) countdownEl.innerText = countdown;
             if (globalRankingCountdownInterval) clearInterval(globalRankingCountdownInterval);
