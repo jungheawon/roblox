@@ -3384,7 +3384,7 @@
             if (playerKnockback && playerKnockback.lengthSq() > 0.0004) {
                 playerState.pos.x += playerKnockback.x;
                 playerState.pos.z += playerKnockback.z;
-                playerKnockback.multiplyScalar(2.0);
+                playerKnockback.multiplyScalar(0.8);
             } else if (playerKnockback) {
                 playerKnockback.set(0, 0, 0);
             }
