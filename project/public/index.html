@@ -8,8 +8,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Three.js for 3D Graphics -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <!-- Socket.IO client for realtime multiplayer -->
-    <script src="/socket.io/socket.io.js"></script>
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Google Fonts for Roblox UI typography -->
@@ -133,6 +131,13 @@
 <body class="relative w-full h-full select-none overflow-hidden">
     <div id="canvas-container"></div>
     <div id="flash-overlay" class="pointer-events-none absolute inset-0 z-50"></div>
+    <div id="goal-banner" class="hidden pointer-events-none fixed inset-0 z-40 flex items-center justify-center">
+        <div class="roblox-panel px-10 py-6 rounded-3xl text-center border-2" id="goal-banner-box">
+            <div class="text-6xl font-black tracking-wider text-white drop-shadow-lg">⚽ GOAL!</div>
+            <div id="goal-banner-text" class="mt-2 text-xl font-extrabold">빨간팀 득점!</div>
+            <div id="goal-banner-score" class="mt-1 text-sm text-gray-300">0 : 0</div>
+        </div>
+    </div>
 
     <!-- Header Navigation Bar -->
     <header class="absolute top-0 left-0 w-full z-20 p-3 flex justify-between items-center pointer-events-none">
@@ -146,10 +151,6 @@
                 <span class="text-xs bg-green-500/20 text-green-400 font-bold px-2.5 py-0.5 rounded-full border border-green-500/30 flex items-center gap-1.5">
                     <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span> Stage <span id="current-stage-num">1</span>
                 </span>
-            </div>
-            <div class="roblox-panel px-3.5 py-2 rounded-2xl flex items-center space-x-2 text-cyan-300 font-extrabold shadow-md border border-cyan-400/30">
-                <i class="fa-solid fa-tower-broadcast text-sm"></i>
-                <span id="online-status-text" class="text-xs text-white">연결 중...</span>
             </div>
         </div>
 
@@ -179,6 +180,9 @@
             <button onclick="switchGameMode('zombie')" id="mode-btn-zombie" class="mode-tab px-3.5 py-2 rounded-xl text-xs font-bold text-gray-300 hover:text-white hover:bg-white/10 transition-all">
                 <i class="fa-solid fa-skull mr-1 text-red-500"></i> 좀비 서바이벌
             </button>
+            <button onclick="switchGameMode('sports')" id="mode-btn-sports" class="mode-tab px-3.5 py-2 rounded-xl text-xs font-bold text-gray-300 hover:text-white hover:bg-white/10 transition-all">
+                <i class="fa-solid fa-futbol mr-1 text-green-400"></i> 스포츠 리그
+            </button>
         </div>
 
         <!-- Right: Stats & Actions -->
@@ -196,6 +200,16 @@
             <div id="kill-count-panel" class="roblox-panel px-3.5 py-2 rounded-2xl items-center space-x-2 text-red-500 font-extrabold shadow-md border border-red-500/30" style="display:none;">
                 <i class="fa-solid fa-skull-crossbones text-lg text-red-500"></i>
                 <span id="kill-count" class="text-base text-white">0</span>
+            </div>
+
+            <!-- Scoreboard (Sports League Only) -->
+            <div id="sports-score-panel" class="roblox-panel px-3.5 py-2 rounded-2xl items-center gap-2 font-extrabold shadow-md border border-green-500/30" style="display:none;">
+                <i class="fa-solid fa-futbol text-lg text-white"></i>
+                <span class="w-3 h-3 rounded-full bg-red-500"></span>
+                <span id="sports-score-red" class="text-base text-red-400">0</span>
+                <span class="text-gray-400">:</span>
+                <span id="sports-score-blue" class="text-base text-blue-400">0</span>
+                <span class="w-3 h-3 rounded-full bg-blue-500"></span>
             </div>
 
             <!-- Coins -->
@@ -261,7 +275,7 @@
                 <div class="text-yellow-300"><span class="font-bold text-yellow-400">[NoobMaster99]:</span> 햄스터 펫 너무 귀여워요 찌찌!</div>
             </div>
             <form id="chat-form" onsubmit="sendChatMessage(event)" class="mt-2 flex gap-1.5">
-                <input type="text" id="chat-input" maxlength="60" placeholder="메시지 입력..." class="flex-1 bg-black/50 border border-white/20 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500">
+                <input type="text" id="chat-input" placeholder="메시지 입력..." class="flex-1 bg-black/50 border border-white/20 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500">
                 <button type="submit" class="bg-blue-600 text-white text-xs px-3.5 py-1.5 rounded-xl font-bold hover:bg-blue-500 roblox-btn">전송</button>
             </form>
         </div>
@@ -361,20 +375,6 @@
         </div>
     </div>
 
-    <!-- Global Ranking Modal (shown to ALL connected players when anyone finishes Stage 5) -->
-    <div id="global-ranking-modal" class="hidden fixed inset-0 z-[65] bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-        <div class="roblox-panel w-full max-w-md rounded-3xl p-8 border border-yellow-400/40 text-center shadow-2xl">
-            <div class="text-6xl mb-3">🏆</div>
-            <h2 class="text-xl font-black text-yellow-300 mb-1">메가 타워 완주자가 나왔습니다!</h2>
-            <p id="global-ranking-winner" class="text-sm text-gray-300 mb-4"></p>
-            <div id="global-ranking-list" class="text-left space-y-1.5 mb-5 max-h-64 overflow-y-auto"></div>
-            <p class="text-xs text-gray-400 mb-3"><span id="global-ranking-countdown">120</span>초 후 모두 새 게임으로 시작합니다.</p>
-            <button onclick="startNewGlobalRound()" class="roblox-btn bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 text-black font-extrabold px-6 py-3 rounded-2xl text-sm w-full">
-                <i class="fa-solid fa-rotate-right mr-1.5"></i> 지금 바로 새 게임 시작
-            </button>
-        </div>
-    </div>
-
     <!-- Zombie Survival Finish Modal -->
     <!-- Spectator Mode Overlay (after 5 zombie hits) -->
     <div id="spectator-overlay" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
@@ -398,22 +398,6 @@
             <button onclick="restartZombieRun()" class="roblox-btn bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-extrabold px-6 py-3 rounded-2xl text-sm w-full">
                 <i class="fa-solid fa-rotate-right mr-1.5"></i> 다시 시작하기
             </button>
-        </div>
-    </div>
-
-    <!-- Nickname / Join Modal (Multiplayer entry) -->
-    <div id="nickname-modal" class="fixed inset-0 z-[60] bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
-        <div class="roblox-panel w-full max-w-sm rounded-3xl p-8 border border-cyan-400/40 text-center shadow-2xl">
-            <div class="text-5xl mb-3">🧑‍🚀</div>
-            <h2 class="text-xl font-black text-white mb-1">멀티플레이 입장</h2>
-            <p class="text-xs text-gray-400 mb-5">닉네임을 입력하고 최대 40명과 함께 플레이하세요.</p>
-            <input id="nickname-input" maxlength="10" placeholder="닉네임 (최대 10자)" autofocus
-                class="w-full mb-4 px-4 py-3 rounded-2xl bg-black/40 border border-white/20 text-white text-sm text-center outline-none focus:border-cyan-400"
-                onkeydown="if(event.key==='Enter') joinMultiplayerGame();">
-            <button onclick="joinMultiplayerGame()" class="roblox-btn bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-extrabold px-6 py-3 rounded-2xl text-sm w-full">
-                <i class="fa-solid fa-play mr-1.5"></i> 게임 입장하기
-            </button>
-            <p id="nickname-modal-msg" class="text-xs text-red-400 mt-3 hidden"></p>
         </div>
     </div>
 
@@ -541,69 +525,6 @@
                                 <span class="w-3.5 h-3.5 border border-green-400 transform rotate-45 flex items-center justify-center text-[7px]">R$</span> 300
                             </span>
                             <button onclick="buyItem('sword', 300)" class="bg-yellow-600 hover:bg-yellow-500 text-black font-bold text-xs px-3 py-1.5 rounded-xl roblox-btn">
-                                착용하기
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Diamond Sword Skin -->
-                    <div class="bg-white/5 border border-white/10 hover:border-cyan-400 rounded-2xl p-3.5 flex flex-col justify-between transition-all">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-12 h-12 bg-cyan-600/30 rounded-xl flex items-center justify-center text-2xl text-cyan-300 border border-cyan-400/30">
-                                <i class="fa-solid fa-gem"></i>
-                            </div>
-                            <div>
-                                <div class="font-bold text-sm">다이아몬드 블레이드</div>
-                                <div class="text-xs text-cyan-300">무기 스킨</div>
-                            </div>
-                        </div>
-                        <div class="mt-3 flex items-center justify-between">
-                            <span class="text-green-400 font-extrabold text-xs flex items-center gap-1">
-                                <span class="w-3.5 h-3.5 border border-green-400 transform rotate-45 flex items-center justify-center text-[7px]">R$</span> 600
-                            </span>
-                            <button onclick="buyItem('diamondsword', 600)" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs px-3 py-1.5 rounded-xl roblox-btn">
-                                착용하기
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Speed Boots -->
-                    <div class="bg-white/5 border border-white/10 hover:border-green-500 rounded-2xl p-3.5 flex flex-col justify-between transition-all">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-12 h-12 bg-green-600/30 rounded-xl flex items-center justify-center text-2xl text-green-400 border border-green-500/30">
-                                <i class="fa-solid fa-shoe-prints"></i>
-                            </div>
-                            <div>
-                                <div class="font-bold text-sm">스피드 부츠</div>
-                                <div class="text-xs text-green-300">이동 속도 +35%</div>
-                            </div>
-                        </div>
-                        <div class="mt-3 flex items-center justify-between">
-                            <span class="text-green-400 font-extrabold text-xs flex items-center gap-1">
-                                <span class="w-3.5 h-3.5 border border-green-400 transform rotate-45 flex items-center justify-center text-[7px]">R$</span> 450
-                            </span>
-                            <button onclick="buyItem('speedboots', 450)" class="bg-green-600 hover:bg-green-500 text-white font-bold text-xs px-3 py-1.5 rounded-xl roblox-btn">
-                                착용하기
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Jump Booster -->
-                    <div class="bg-white/5 border border-white/10 hover:border-orange-400 rounded-2xl p-3.5 flex flex-col justify-between transition-all">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-12 h-12 bg-orange-600/30 rounded-xl flex items-center justify-center text-2xl text-orange-400 border border-orange-500/30">
-                                <i class="fa-solid fa-arrow-up-from-bracket"></i>
-                            </div>
-                            <div>
-                                <div class="font-bold text-sm">슈퍼 점프 부스터</div>
-                                <div class="text-xs text-orange-300">점프력 +30%</div>
-                            </div>
-                        </div>
-                        <div class="mt-3 flex items-center justify-between">
-                            <span class="text-green-400 font-extrabold text-xs flex items-center gap-1">
-                                <span class="w-3.5 h-3.5 border border-green-400 transform rotate-45 flex items-center justify-center text-[7px]">R$</span> 400
-                            </span>
-                            <button onclick="buyItem('jumpboost', 400)" class="bg-orange-600 hover:bg-orange-500 text-white font-bold text-xs px-3 py-1.5 rounded-xl roblox-btn">
                                 착용하기
                             </button>
                         </div>
@@ -985,7 +906,6 @@
             isGrounded: false,
             speedMultiplier: 1.0,
             gravityMultiplier: 1.0,
-            jumpMultiplier: 1.0,
             isFlying: false,
             coins: 0,
             robux: 1500,
@@ -1005,20 +925,6 @@
         const keys = { KeyW: false, KeyS: false, KeyA: false, KeyD: false, Space: false };
         let touchJoystick = { x: 0, y: 0, active: false };
         let swordSwingTimer = 0;
-
-        // ---- Multiplayer State (up to 40 concurrent players) ----
-        const MAX_ONLINE_PLAYERS = 40;
-        const PLAYER_COLLIDE_RADIUS = 1.25; // half-width used for no-overlap push-apart
-        const NETWORK_SEND_INTERVAL_MS = 80; // ~12.5Hz outgoing state updates
-        let socket = null;
-        let myPlayerId = null;
-        let myNickname = '플레이어';
-        let hasJoinedMultiplayer = false;
-        let remotePlayers = {}; // id -> { mesh, nameSprite, targetPos, targetRotY, lastPos, stepCount, swordSwingTimer, lastUpdateTime }
-        let lastNetworkSendAt = 0;
-        let playerKnockback = null; // THREE.Vector3, created after THREE is confirmed loaded
-        let localHitTimer = 0; // brief squash animation when this player takes a hit
-        let camVec3 = new THREE.Vector3(); // reusable THREE.Vector3 for camera target (avoids per-frame allocation)
 
         // World Objects
         let platforms = [];
@@ -1043,6 +949,20 @@
         let zombieStartPos = new THREE.Vector3();
         let zombieFinishPos = new THREE.Vector3();
         let zombieFinishReached = false;
+
+        // Sports League Mode State
+        let sportsBall = null;            // { mesh, vel, cooldowns, goalLock }
+        let sportsGeneration = 0;         // invalidates pending ball resets after a mode switch
+        let sportsScores = { red: 0, blue: 0 };
+        let sportsRoster = [];            // join order: 1st → red, 2nd → blue, 3rd → red ...
+        const SPORTS_HALF_W = 40;         // field half width (x)
+        const SPORTS_HALF_L = 60;         // goal line at z = ±60
+        const SPORTS_GOAL_HALF_W = 8;     // goal mouth half width
+        const SPORTS_GOAL_H = 6;          // crossbar height
+        const SPORTS_GOAL_DEPTH = 6;
+        const SPORTS_BALL_R = 1.4;
+        const SPORTS_KICK_POWER = 1.3;    // big shove - ball travels far
+        const SPORTS_PLAYER_START = new THREE.Vector3(0, 5, 22);
         const ZOMBIE_OUTER_SIZE = 220;
         const ZOMBIE_TRACK_WIDTH = 40;
         const ZOMBIE_OUTER_HALF = ZOMBIE_OUTER_SIZE / 2;
@@ -1365,6 +1285,12 @@
                 npcCompanion.wanderTarget = null;
             }
 
+            // Sports League: the NPC plays for the blue team and chases the ball
+            if (activeGameMode === 'sports' && sportsBall) {
+                updateNpcSports();
+                return;
+            }
+
             const speed = 0.012; // deliberately very slow and sluggish
 
             if (!npcCompanion.wanderTarget || npcCompanion.mesh.position.distanceTo(npcCompanion.wanderTarget) < 1.5) {
@@ -1476,41 +1402,6 @@
             coins.push(coin);
         }
 
-        function sprinkleCoinsOnPlatform(plat) {
-            // Generously scatters coins on top of a platform, scaled to its footprint
-            // so big platforms (spawn, checkpoints, beams) get several coins and small
-            // steps/tiles still get at least one.
-            if (boostPads.includes(plat)) return; // boost pads are only touched briefly - skip
-            const box = new THREE.Box3().setFromObject(plat);
-            const sizeX = box.max.x - box.min.x;
-            const sizeZ = box.max.z - box.min.z;
-            if (sizeX < 1.5 || sizeZ < 1.5) return; // too thin to place a coin safely
-            const area = sizeX * sizeZ;
-            const count = Math.max(2, Math.min(8, Math.round(area / 16)));
-            const y = box.max.y + 1.6;
-            for (let i = 0; i < count; i++) {
-                const t = count === 1 ? 0.5 : (i + 0.5) / count;
-                const jitterX = (Math.random() - 0.5) * Math.min(2, sizeX * 0.2);
-                const jitterZ = (Math.random() - 0.5) * Math.min(2, sizeZ * 0.2);
-                const x = THREE.MathUtils.lerp(box.min.x + 1, box.max.x - 1, sizeX > sizeZ ? t : Math.random()) + jitterX;
-                const z = THREE.MathUtils.lerp(box.min.z + 1, box.max.z - 1, sizeX > sizeZ ? Math.random() : t) + jitterZ;
-                createCoin(x, y, z);
-            }
-        }
-
-        function updateMovingPlatforms() {
-            // Swings any platform flagged isMovingPlatform left/right along X, and
-            // records how far it moved this frame (deltaX) so a standing player can be
-            // carried along with it instead of sliding off.
-            const t = Date.now() * 0.001;
-            platforms.forEach(p => {
-                if (!p.userData.isMovingPlatform) return;
-                const newX = p.userData.baseX + Math.sin(t * p.userData.moveSpeed + p.userData.movePhase) * p.userData.moveRange;
-                p.userData.deltaX = newX - p.position.x;
-                p.position.x = newX;
-            });
-        }
-
         function clearWorldEntities() {
             if (tycoonInterval) clearInterval(tycoonInterval);
             if (zombieSpawnInterval) { clearInterval(zombieSpawnInterval); zombieSpawnInterval = null; }
@@ -1542,6 +1433,12 @@
             bullets = [];
             cannonballs = [];
             cannonMesh = null;
+
+            if (sportsBall) {
+                scene.remove(sportsBall.mesh);
+                sportsBall = null;
+            }
+            sportsGeneration++;
         }
 
         function spawnZombieOnRandomPlatform() {
@@ -1598,6 +1495,7 @@
                     step.position.set(offsetX + Math.sin(i * 0.5) * 1.3, i * 1.0, seg1StartZ - (i * seg1Depth));
                     scene.add(step);
                     platforms.push(step);
+                    if (i % 3 === 1) createCoin(step.position.x, step.position.y + 1.8, step.position.z);
                 }
             });
             const seg1EndZ = seg1StartZ - (seg1Steps - 1) * seg1Depth;
@@ -1650,6 +1548,7 @@
                     tile.userData.triggered = false;
                     scene.add(tile);
                     platforms.push(tile);
+                    if (i % 2 === 0) createCoin(tile.position.x, tile.position.y + 1.6, tile.position.z);
                 }
             });
             const seg3EndZ = seg3StartZ - (hopCount - 1) * hopSpacing;
@@ -1662,24 +1561,17 @@
             platforms.push(stage4Platform);
             createCheckpoint(0, 10.5, cp4Z, 4);
 
-            // === Segment 4 (Stage 4 -> 5): Triple-Lane Speed Boost + Moving Beam Finale ===
+            // === Segment 4 (Stage 4 -> 5): Triple-Lane Speed Boost + Beam Finale ===
             const seg4StartZ = cp4Z - 12;
-            laneOffsets.forEach((offsetX, laneIdx) => {
+            laneOffsets.forEach(offsetX => {
                 const boost = new THREE.Mesh(new THREE.BoxGeometry(6, 0.3, 6), new THREE.MeshBasicMaterial({ color: 0x00FFFF }));
                 boost.position.set(offsetX, 10.2, seg4StartZ);
                 scene.add(boost);
                 boostPads.push(boost);
                 platforms.push(boost);
 
-                // Moving platform - swings left/right so you have to time your run across it
                 const beam = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.6, 26), new THREE.MeshStandardMaterial({ color: 0xFFD700, metalness: 0.6, roughness: 0.3 }));
                 beam.position.set(offsetX, 10.0, seg4StartZ - 20);
-                beam.userData.isMovingPlatform = true;
-                beam.userData.baseX = offsetX;
-                beam.userData.moveRange = 5.5;
-                beam.userData.moveSpeed = 0.85 + laneIdx * 0.18;
-                beam.userData.movePhase = laneIdx * (Math.PI / 1.4);
-                beam.userData.deltaX = 0;
                 scene.add(beam);
                 platforms.push(beam);
             });
@@ -1692,9 +1584,6 @@
             scene.add(winPlatform);
             platforms.push(winPlatform);
             createCheckpoint(0, 10.5, finishZ, 5, 'create by 공영서');
-
-            // Sprinkle coins generously across every platform in the course
-            platforms.forEach(plat => sprinkleCoinsOnPlatform(plat));
 
             obbyFinishPos = new THREE.Vector3(0, 10.5, finishZ);
             obbyFinishReached = false;
@@ -1873,7 +1762,7 @@
             const ballGeo = new THREE.SphereGeometry(0.6, 10, 10);
             const ballMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.7, roughness: 0.3 });
             const ball = new THREE.Mesh(ballGeo, ballMat);
-            ball.position.copy(cannonMesh.position).add(toPlayer.clone().multiplyScalar(2.0));
+            ball.position.copy(cannonMesh.position).add(toPlayer.clone().multiplyScalar(2.4));
             scene.add(ball);
             cannonballs.push({ mesh: ball, dir: toPlayer.clone(), dist: 0 });
             audio.playBoostSound();
@@ -2197,6 +2086,11 @@
                     }
                 }
 
+                if (!hit && sportsBall && sportsBall.mesh.position.distanceTo(b.mesh.position) < SPORTS_BALL_R + 0.4) {
+                    kickBallInDirection(b.dir, 1.3);
+                    hit = true;
+                }
+
                 if (!hit && npcCompanion.mesh && npcCompanion.mesh.position.distanceTo(b.mesh.position) < 1.8) {
                     knockbackNpc(b.dir);
                     hit = true;
@@ -2242,7 +2136,7 @@
         function fireGun() {
             // Bullets fly in the direction the character is facing
             const dir = new THREE.Vector3(Math.sin(playerGroup.rotation.y), 0, Math.cos(playerGroup.rotation.y));
-            const spawnPos = playerState.pos.clone().add(new THREE.Vector3(0, 2.0, 0)).add(dir.clone().multiplyScalar(2.0));
+            const spawnPos = playerState.pos.clone().add(new THREE.Vector3(0, 2.0, 0)).add(dir.clone().multiplyScalar(1.2));
 
             const bulletGeo = new THREE.SphereGeometry(0.18, 8, 8);
             const bulletMat = new THREE.MeshBasicMaterial({ color: 0xFFEE44 });
@@ -2305,18 +2199,7 @@
             if (obbyFinishReached) return;
             if (playerState.pos.distanceTo(obbyFinishPos) < 5) {
                 obbyFinishReached = true;
-                audio.playCheckpointSound();
-                launchFireworks();
-                setTimeout(launchFireworks, 300);
-                setTimeout(launchFireworks, 650);
-
-                if (socket && hasJoinedMultiplayer) {
-                    // The global ranking popup (with everyone's coin count) will arrive
-                    // for every connected player, including this one, via 'game-over'.
-                    socket.emit('game-finished', { coins: playerState.coins });
-                } else {
-                    showObbyFinishModal();
-                }
+                showObbyFinishModal();
             }
         }
 
@@ -2329,6 +2212,10 @@
             document.getElementById('obby-finish-rank').innerText = `순위: ${rankLabels[rank] || rank + '위'}`;
             document.getElementById('obby-finish-score').innerText = finalScore;
             document.getElementById('obby-finish-modal').classList.remove('hidden');
+            audio.playCheckpointSound();
+            launchFireworks();
+            setTimeout(launchFireworks, 300);
+            setTimeout(launchFireworks, 650);
         }
 
         function restartObbyRun() {
@@ -2338,62 +2225,8 @@
             playerState.checkpointPos.set(0, 5, 0);
             playerState.vel.set(0, 0, 0);
             playerState.stage = 1;
-            playerState.coins = 0;
-            updateUIStats();
             document.getElementById('current-stage-num').innerText = '1';
         }
-
-        let globalRankingCountdownInterval = null;
-
-        function showGlobalRankingModal(ranking, winnerNickname) {
-            const modal = document.getElementById('global-ranking-modal');
-            const listEl = document.getElementById('global-ranking-list');
-            const winnerEl = document.getElementById('global-ranking-winner');
-            if (!modal || !listEl) return;
-
-            winnerEl.innerText = winnerNickname
-                ? `🎉 ${winnerNickname}님이 가장 먼저 완주했습니다!`
-                : '메가 타워 완주자가 나왔습니다!';
-
-            listEl.innerHTML = '';
-            const medals = ['🥇', '🥈', '🥉'];
-            (ranking || []).forEach((p, i) => {
-                const row = document.createElement('div');
-                row.className = 'flex items-center justify-between bg-black/30 rounded-xl px-3 py-2 text-sm';
-                row.innerHTML = `<span class="font-bold text-white">${medals[i] || (i + 1) + '위'} ${escapeHtml(p.nickname)}</span><span class="text-yellow-300 font-extrabold">${p.coins}코인</span>`;
-                listEl.appendChild(row);
-            });
-
-            document.getElementById('obby-finish-modal').classList.add('hidden');
-            modal.classList.remove('hidden');
-
-            let countdown = 120;
-            const countdownEl = document.getElementById('global-ranking-countdown');
-            if (countdownEl) countdownEl.innerText = countdown;
-            if (globalRankingCountdownInterval) clearInterval(globalRankingCountdownInterval);
-            globalRankingCountdownInterval = setInterval(() => {
-                countdown--;
-                if (countdownEl) countdownEl.innerText = countdown;
-                if (countdown <= 0) {
-                    clearInterval(globalRankingCountdownInterval);
-                    globalRankingCountdownInterval = null;
-                    startNewGlobalRound();
-                }
-            }, 1000);
-        }
-
-        function startNewGlobalRound() {
-            if (globalRankingCountdownInterval) {
-                clearInterval(globalRankingCountdownInterval);
-                globalRankingCountdownInterval = null;
-            }
-            const modal = document.getElementById('global-ranking-modal');
-            if (modal) modal.classList.add('hidden');
-            if (activeGameMode === 'obby') {
-                restartObbyRun();
-            }
-        }
-
 
         function enterSpectatorMode() {
             if (isSpectating) return;
@@ -2410,6 +2243,8 @@
 
             if (activeGameMode === 'zombie') {
                 playerState.pos.set(zombieStartPos.x, zombieStartPos.y + 5, zombieStartPos.z);
+            } else if (activeGameMode === 'sports') {
+                playerState.pos.copy(SPORTS_PLAYER_START);
             } else {
                 playerState.pos.set(0, 5, 0);
             }
@@ -2514,8 +2349,403 @@
             resetNpcCompanion(zombieStartPos.x + 4, zombieStartPos.y, zombieStartPos.z - 4);
         }
 
+        /* ================= SPORTS LEAGUE MODE ================= */
+
+        function createFieldTexture() {
+            // 5px per world unit: field 80 x 136 (incl. 8 units behind each goal line)
+            const s = 5;
+            const W = SPORTS_HALF_W * 2 * s;
+            const L = (SPORTS_HALF_L + 8) * 2 * s;
+            const canvas = document.createElement('canvas');
+            canvas.width = W;
+            canvas.height = L;
+            const ctx = canvas.getContext('2d');
+
+            // Mowed grass stripes
+            const stripes = 14;
+            for (let i = 0; i < stripes; i++) {
+                ctx.fillStyle = i % 2 === 0 ? '#2E9E44' : '#278A3A';
+                ctx.fillRect(0, (L / stripes) * i, W, L / stripes + 1);
+            }
+
+            const zToY = z => (z + SPORTS_HALF_L + 8) * s;
+            const xToX = x => (x + SPORTS_HALF_W) * s;
+            ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+            ctx.lineWidth = 4;
+
+            // Outer boundary
+            ctx.strokeRect(xToX(-SPORTS_HALF_W) + 4, zToY(-SPORTS_HALF_L), W - 8, SPORTS_HALF_L * 2 * s);
+            // Halfway line + centre circle + spot
+            ctx.beginPath(); ctx.moveTo(0, zToY(0)); ctx.lineTo(W, zToY(0)); ctx.stroke();
+            ctx.beginPath(); ctx.arc(W / 2, zToY(0), 10 * s, 0, Math.PI * 2); ctx.stroke();
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath(); ctx.arc(W / 2, zToY(0), 6, 0, Math.PI * 2); ctx.fill();
+
+            // Penalty & goal boxes on both ends
+            [-1, 1].forEach(side => {
+                const line = side * SPORTS_HALF_L;
+                const drawBox = (halfW, depth) => {
+                    const y1 = zToY(line);
+                    const y2 = zToY(line - side * depth);
+                    ctx.strokeRect(xToX(-halfW), Math.min(y1, y2), halfW * 2 * s, Math.abs(y2 - y1));
+                };
+                drawBox(20, 16);
+                drawBox(11, 6);
+                ctx.beginPath(); ctx.arc(W / 2, zToY(line - side * 11), 5, 0, Math.PI * 2); ctx.fill();
+            });
+
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.anisotropy = 4;
+            return tex;
+        }
+
+        function createSoccerBallTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, 256, 128);
+            ctx.fillStyle = '#111111';
+            const spots = [[32, 30], [96, 30], [160, 30], [224, 30], [0, 85], [64, 85], [128, 85], [192, 85], [256, 85]];
+            spots.forEach(([x, y]) => {
+                ctx.beginPath();
+                for (let i = 0; i < 5; i++) {
+                    const a = (i / 5) * Math.PI * 2 - Math.PI / 2;
+                    ctx[i === 0 ? 'moveTo' : 'lineTo'](x + Math.cos(a) * 14, y + Math.sin(a) * 14);
+                }
+                ctx.closePath();
+                ctx.fill();
+            });
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        function createSportsGoal(side, colorHex) {
+            // side = -1 (north goal, z=-60) or +1 (south goal, z=+60)
+            const group = new THREE.Group();
+            const postMat = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 0.3 });
+            const accentMat = new THREE.MeshStandardMaterial({ color: colorHex, emissive: colorHex, emissiveIntensity: 0.35 });
+            const lineZ = side * SPORTS_HALF_L;
+            const backZ = side * (SPORTS_HALF_L + SPORTS_GOAL_DEPTH);
+
+            [-SPORTS_GOAL_HALF_W, SPORTS_GOAL_HALF_W].forEach(x => {
+                const post = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, SPORTS_GOAL_H, 10), postMat);
+                post.position.set(x, 0.5 + SPORTS_GOAL_H / 2, lineZ);
+                post.castShadow = true;
+                group.add(post);
+
+                const backPost = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, SPORTS_GOAL_H, 8), accentMat);
+                backPost.position.set(x, 0.5 + SPORTS_GOAL_H / 2, backZ);
+                group.add(backPost);
+            });
+
+            const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, SPORTS_GOAL_HALF_W * 2 + 0.6, 10), accentMat);
+            bar.rotation.z = Math.PI / 2;
+            bar.position.set(0, 0.5 + SPORTS_GOAL_H, lineZ);
+            group.add(bar);
+
+            const net = new THREE.Mesh(
+                new THREE.BoxGeometry(SPORTS_GOAL_HALF_W * 2, SPORTS_GOAL_H, SPORTS_GOAL_DEPTH, 12, 6, 5),
+                new THREE.MeshBasicMaterial({ color: 0xFFFFFF, wireframe: true, transparent: true, opacity: 0.35 })
+            );
+            net.position.set(0, 0.5 + SPORTS_GOAL_H / 2, side * (SPORTS_HALF_L + SPORTS_GOAL_DEPTH / 2));
+            group.add(net);
+
+            scene.add(group);
+            dynamicEntities.push(group);
+        }
+
+        function updateSportsHud() {
+            document.getElementById('sports-score-red').innerText = sportsScores.red;
+            document.getElementById('sports-score-blue').innerText = sportsScores.blue;
+        }
+
+        function joinSportsTeam(name, torsoMesh) {
+            // Teams are assigned in join order: 1st red, 2nd blue, alternating after that
+            const team = sportsRoster.length % 2 === 0 ? 'red' : 'blue';
+            sportsRoster.push({ name, team });
+            if (torsoMesh) torsoMesh.material.color.setHex(team === 'red' ? 0xE53935 : 0x1E6BFF);
+
+            const chatBox = document.getElementById('chat-messages');
+            const note = document.createElement('div');
+            note.className = team === 'red' ? 'text-red-400 font-bold' : 'text-blue-400 font-bold';
+            note.innerText = `[입장 ${sportsRoster.length}번째]: ${name} → ${team === 'red' ? '🔴 빨간팀' : '🔵 파란팀'}`;
+            chatBox.appendChild(note);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            return team;
+        }
+
+        function restoreDefaultTeamColors() {
+            if (playerMesh && playerMesh.children[0]) playerMesh.children[0].material.color.setHex(0x00A2FF);
+            if (npcCompanion.mesh && npcCompanion.mesh.children[0]) npcCompanion.mesh.children[0].material.color.setHex(0xFF8C1A);
+        }
+
+        function resetSportsBall() {
+            if (!sportsBall) return;
+            sportsBall.mesh.position.set(0, 0.5 + SPORTS_BALL_R, 0);
+            sportsBall.mesh.rotation.set(0, 0, 0);
+            sportsBall.vel.set(0, 0, 0);
+            sportsBall.goalLock = false;
+            sportsBall.cooldowns = {};
+        }
+
+        function buildSportsWorld() {
+            clearWorldEntities();
+
+            scene.background = new THREE.Color(0x7EC8FF);
+            scene.fog = new THREE.FogExp2(0x7EC8FF, 0.0035);
+
+            const totalL = (SPORTS_HALF_L + 8) * 2;
+
+            // Pitch base (walkable platform) + painted grass on top
+            const pitch = new THREE.Mesh(
+                new THREE.BoxGeometry(SPORTS_HALF_W * 2, 1, totalL),
+                new THREE.MeshStandardMaterial({ color: 0x1F6E2E })
+            );
+            pitch.position.set(0, 0, 0);
+            pitch.receiveShadow = true;
+            scene.add(pitch);
+            platforms.push(pitch);
+
+            const grass = new THREE.Mesh(
+                new THREE.PlaneGeometry(SPORTS_HALF_W * 2, totalL),
+                new THREE.MeshStandardMaterial({ map: createFieldTexture(), roughness: 0.9 })
+            );
+            grass.rotation.x = -Math.PI / 2;
+            grass.position.y = 0.51;
+            grass.receiveShadow = true;
+            scene.add(grass);
+            dynamicEntities.push(grass);
+
+            // Low advertising boards around the pitch (decorative)
+            const boardMat = new THREE.MeshStandardMaterial({ color: 0x1B1F2A });
+            const sideBoardGeo = new THREE.BoxGeometry(0.6, 1.4, totalL);
+            [-1, 1].forEach(sx => {
+                const b = new THREE.Mesh(sideBoardGeo, boardMat);
+                b.position.set(sx * (SPORTS_HALF_W + 0.6), 1.2, 0);
+                scene.add(b);
+                dynamicEntities.push(b);
+            });
+            const endBoardGeo = new THREE.BoxGeometry(SPORTS_HALF_W * 2 + 1.8, 1.4, 0.6);
+            [-1, 1].forEach(sz => {
+                const b = new THREE.Mesh(endBoardGeo, boardMat);
+                b.position.set(0, 1.2, sz * (totalL / 2 + 0.6));
+                scene.add(b);
+                dynamicEntities.push(b);
+            });
+
+            // North goal (z=-60) is defended by BLUE → red scores there.
+            // South goal (z=+60) is defended by RED → blue scores there.
+            createSportsGoal(-1, 0x1E6BFF);
+            createSportsGoal(1, 0xE53935);
+
+            // Ball at the centre spot
+            const ballMesh = new THREE.Mesh(
+                new THREE.SphereGeometry(SPORTS_BALL_R, 24, 18),
+                new THREE.MeshStandardMaterial({ map: createSoccerBallTexture(), roughness: 0.4 })
+            );
+            ballMesh.castShadow = true;
+            scene.add(ballMesh);
+            sportsBall = { mesh: ballMesh, vel: new THREE.Vector3(), cooldowns: {}, goalLock: false };
+            resetSportsBall();
+
+            sportsScores = { red: 0, blue: 0 };
+            updateSportsHud();
+
+            // Team assignment in join order: player enters first, NPC enters second
+            sportsRoster = [];
+            joinSportsTeam('나 (Player)', playerMesh.children[0]);
+            resetNpcCompanion(0, 0.5, -22);
+            joinSportsTeam('NPC 동료', npcCompanion.mesh.children[0]);
+            showNotification('⚽ 스포츠 리그! 빨간팀은 위쪽(파란) 골대, 파란팀은 아래쪽(빨간) 골대를 노리세요.');
+        }
+
+        function tryKickBall(kickerPos, aimDir, key) {
+            const b = sportsBall;
+            const p = b.mesh.position;
+            const dx = p.x - kickerPos.x;
+            const dz = p.z - kickerPos.z;
+            const d = Math.hypot(dx, dz);
+            const reach = SPORTS_BALL_R + 1.0;
+            if (d >= reach || p.y > kickerPos.y + 3.6 || p.y < kickerPos.y - 1.2) return;
+
+            let dir = d > 0.001 ? new THREE.Vector3(dx / d, 0, dz / d) : new THREE.Vector3(0, 0, -1);
+            // Keep the ball from sinking into the kicker
+            p.x = kickerPos.x + dir.x * reach;
+            p.z = kickerPos.z + dir.z * reach;
+
+            if (b.cooldowns[key] > 0) return;
+            if (aimDir) dir = dir.multiplyScalar(0.35).add(aimDir.clone().multiplyScalar(0.65)).normalize();
+            b.vel.set(dir.x * SPORTS_KICK_POWER, 0.18, dir.z * SPORTS_KICK_POWER);
+            b.cooldowns[key] = 12;
+            audio.playHitSound();
+        }
+
+        function kickBallInDirection(dir, power) {
+            if (!sportsBall || sportsBall.goalLock) return;
+            const d = dir.clone();
+            d.y = 0;
+            if (d.lengthSq() < 0.0001) return;
+            d.normalize();
+            sportsBall.vel.set(d.x * power, 0.3, d.z * power);
+            audio.playHitSound();
+        }
+
+        function scoreGoal(team) {
+            const b = sportsBall;
+            b.goalLock = true;
+            sportsScores[team]++;
+            updateSportsHud();
+
+            const teamLabel = team === 'red' ? '🔴 빨간팀' : '🔵 파란팀';
+            showNotification(`⚽ 골!! ${teamLabel} 득점! (빨강 ${sportsScores.red} : ${sportsScores.blue} 파랑)`);
+            if (team === 'red') {
+                playerState.coins += 50;
+                updateUIStats();
+            }
+
+            const banner = document.getElementById('goal-banner');
+            const box = document.getElementById('goal-banner-box');
+            const text = document.getElementById('goal-banner-text');
+            text.innerText = `${teamLabel} 득점!`;
+            text.className = `mt-2 text-xl font-extrabold ${team === 'red' ? 'text-red-400' : 'text-blue-400'}`;
+            box.style.borderColor = team === 'red' ? '#EF4444' : '#3B82F6';
+            document.getElementById('goal-banner-score').innerText = `빨강 ${sportsScores.red} : ${sportsScores.blue} 파랑`;
+            banner.classList.remove('hidden');
+
+            audio.playCheckpointSound();
+            launchFireworks();
+            setTimeout(launchFireworks, 300);
+
+            const gen = sportsGeneration;
+            setTimeout(() => {
+                banner.classList.add('hidden');
+                if (gen !== sportsGeneration) return; // mode was switched meanwhile
+                resetSportsBall();
+                showNotification('공이 센터로 돌아왔습니다. 경기 재개!');
+            }, 1800);
+        }
+
+        function updateSportsBall() {
+            if (!sportsBall) return;
+            const b = sportsBall;
+            const p = b.mesh.position;
+            const v = b.vel;
+            const r = SPORTS_BALL_R;
+
+            Object.keys(b.cooldowns).forEach(k => { if (b.cooldowns[k] > 0) b.cooldowns[k]--; });
+
+            if (!b.goalLock) {
+                // Player touches the ball → it gets launched away from them
+                if (!isSpectating) tryKickBall(playerState.pos, null, 'player');
+
+                // NPC (blue) aims toward the south goal when it touches the ball
+                if (npcCompanion.alive && npcCompanion.mesh && npcCompanion.state !== 'knockback') {
+                    const aim = new THREE.Vector3(0, 0, SPORTS_HALF_L + 2).sub(p);
+                    aim.y = 0;
+                    aim.normalize();
+                    tryKickBall(npcCompanion.mesh.position, aim, 'npc');
+                }
+            }
+
+            // Gravity, movement, bouncing on the grass
+            v.y -= 0.02;
+            p.add(v);
+            const floorY = 0.5 + r;
+            if (p.y < floorY) {
+                p.y = floorY;
+                v.y = v.y < -0.08 ? -v.y * 0.3 : 0;
+            }
+            const onGround = p.y <= floorY + 0.01;
+            const friction = onGround ? 0.955 : 0.99;
+            v.x *= friction;
+            v.z *= friction;
+
+            // Rolling spin
+            b.mesh.rotation.x += v.z / r;
+            b.mesh.rotation.z -= v.x / r;
+
+            // Side boards
+            const maxX = SPORTS_HALF_W - r;
+            if (p.x > maxX) { p.x = maxX; v.x = -Math.abs(v.x) * 0.7; }
+            if (p.x < -maxX) { p.x = -maxX; v.x = Math.abs(v.x) * 0.7; }
+
+            // Goal lines - open only inside the goal mouth and under the crossbar
+            const lineZ = SPORTS_HALF_L - r;
+            const inMouth = Math.abs(p.x) < SPORTS_GOAL_HALF_W - r * 0.5 && p.y < 0.5 + SPORTS_GOAL_H - r * 0.5;
+            if (Math.abs(p.z) > lineZ) {
+                const side = Math.sign(p.z);
+                if (inMouth || b.goalLock) {
+                    // Inside the net: keep it between the posts and in front of the back net
+                    const maxGX = SPORTS_GOAL_HALF_W - r;
+                    if (Math.abs(p.x) > maxGX) { p.x = Math.sign(p.x) * maxGX; v.x *= -0.4; }
+                    const backZ = SPORTS_HALF_L + SPORTS_GOAL_DEPTH - r;
+                    if (Math.abs(p.z) > backZ) { p.z = side * backZ; v.z = -v.z * 0.25; }
+
+                    if (!b.goalLock && Math.abs(p.z) > SPORTS_HALF_L + r) {
+                        scoreGoal(side < 0 ? 'red' : 'blue');
+                    }
+                } else {
+                    p.z = side * lineZ;
+                    v.z = -v.z * 0.7;
+                }
+            }
+        }
+
+        function updateNpcSports() {
+            const m = npcCompanion.mesh;
+            const ball = sportsBall.mesh.position;
+
+            // Blue attacks the south goal (z = +60)
+            const aim = new THREE.Vector3(0, 0, SPORTS_HALF_L + 2).sub(ball);
+            aim.y = 0;
+            aim.normalize();
+
+            let target;
+            const fromBall = m.position.clone().sub(ball);
+            fromBall.y = 0;
+            if (fromBall.dot(aim) > 0.5) {
+                // NPC is goal-side of the ball - loop around it instead of kicking it backward
+                const perp = new THREE.Vector3(-aim.z, 0, aim.x);
+                if (fromBall.dot(perp) < 0) perp.negate();
+                target = ball.clone().add(perp.multiplyScalar(4)).sub(aim.clone().multiplyScalar(2));
+            } else {
+                // Approach from behind the ball, lined up with the goal
+                target = ball.clone().sub(aim.clone().multiplyScalar(1.2));
+            }
+
+            const dir = target.sub(m.position);
+            dir.y = 0;
+            const dist = dir.length();
+            const speed = sportsBall.goalLock ? 0.04 : 0.11;
+            if (dist > 0.3) {
+                dir.normalize();
+                m.position.x += dir.x * speed;
+                m.position.z += dir.z * speed;
+                m.lookAt(m.position.x + dir.x, m.position.y, m.position.z + dir.z);
+
+                npcCompanion.stepCount += 0.2;
+                const la = m.getObjectByName('npcLeftArm');
+                const ra = m.getObjectByName('npcRightArm');
+                const ll = m.getObjectByName('npcLeftLeg');
+                const rl = m.getObjectByName('npcRightLeg');
+                if (la && ra && ll && rl) {
+                    la.rotation.x = Math.sin(npcCompanion.stepCount) * 0.7;
+                    ra.rotation.x = -Math.sin(npcCompanion.stepCount) * 0.7;
+                    ll.rotation.x = -Math.sin(npcCompanion.stepCount) * 0.7;
+                    rl.rotation.x = Math.sin(npcCompanion.stepCount) * 0.7;
+                }
+            }
+
+            m.position.x = THREE.MathUtils.clamp(m.position.x, -(SPORTS_HALF_W - 1), SPORTS_HALF_W - 1);
+            m.position.z = THREE.MathUtils.clamp(m.position.z, -(SPORTS_HALF_L + 7), SPORTS_HALF_L + 7);
+            const groundY = findGroundY(m.position.x, m.position.z, m.position.y + 1);
+            if (groundY !== null) m.position.y = groundY;
+        }
+
         function switchGameMode(mode) {
             activeGameMode = mode;
+            restoreDefaultTeamColors();
             modeGravityScale = (mode === 'sandbox') ? 0.35 : 1.0;
             document.querySelectorAll('.mode-tab').forEach(btn => {
                 btn.className = 'mode-tab px-3.5 py-2 rounded-xl text-xs font-bold text-gray-300 hover:text-white hover:bg-white/10 transition-all';
@@ -2539,13 +2769,21 @@
             } else if (mode === 'zombie') {
                 document.getElementById('game-title').innerText = '좀비 서바이벌 루프 트랙';
                 buildZombieWorld();
+            } else if (mode === 'sports') {
+                document.getElementById('game-title').innerText = '스포츠 리그 ⚽';
+                buildSportsWorld();
             }
 
             document.getElementById('kill-count-panel').style.display = (mode === 'zombie') ? 'flex' : 'none';
+            document.getElementById('sports-score-panel').style.display = (mode === 'sports') ? 'flex' : 'none';
 
             if (mode === 'zombie') {
                 playerState.pos.set(zombieStartPos.x, zombieStartPos.y + 5, zombieStartPos.z);
                 playerState.checkpointPos.set(zombieStartPos.x, zombieStartPos.y + 5, zombieStartPos.z);
+            } else if (mode === 'sports') {
+                playerState.pos.copy(SPORTS_PLAYER_START);
+                playerState.checkpointPos.copy(SPORTS_PLAYER_START);
+                playerState.vel.set(0, 0, 0);
             } else {
                 playerState.pos.set(0, 5, 0);
                 playerState.checkpointPos.set(0, 5, 0);
@@ -2620,7 +2858,7 @@
                 const blockMat = new THREE.MeshStandardMaterial({ color: Math.random() * 0xffffff, map: studTexture });
                 const block = new THREE.Mesh(blockGeo, blockMat);
                 
-                const spawnPos = intersect.point.clone().add(intersect.face.normal.clone().multiplyScalar(2.0));
+                const spawnPos = intersect.point.clone().add(intersect.face.normal.clone().multiplyScalar(1.5));
                 spawnPos.x = Math.round(spawnPos.x / 3) * 3;
                 spawnPos.y = Math.round(spawnPos.y / 3) * 3;
                 spawnPos.z = Math.round(spawnPos.z / 3) * 3;
@@ -2689,22 +2927,13 @@
                 }
             }
 
-            // Other online players get knocked back too - the actual push happens on
-            // their own client once the server relays this hit to them. The range/cone
-            // here is deliberately more generous than the zombie check above: remote
-            // positions are network-interpolated, so a tight hitbox would miss real hits.
-            if (socket && hasJoinedMultiplayer) {
-                for (const id in remotePlayers) {
-                    const rp = remotePlayers[id];
-                    if (!rp || !rp.mesh) continue;
-                    const toPlayer = rp.mesh.position.clone().sub(playerState.pos);
-                    toPlayer.y = 0;
-                    const dist = toPlayer.length();
-                    const dot = dist < 0.001 ? 1 : toPlayer.clone().normalize().dot(facing);
-                    if (dist < 4.2 && dot > -0.25) {
-                        socket.emit('sword-hit', { targetId: id, dir: { x: facing.x, z: facing.z } });
-                        showNotification(`${rp.nickname || '상대'}님을 공격!`);
-                    }
+            // Sword swing also smacks the ball hard in the facing direction
+            if (sportsBall) {
+                const toBall = sportsBall.mesh.position.clone().sub(playerState.pos);
+                toBall.y = 0;
+                const distBall = toBall.length();
+                if (distBall < 4 && (distBall < 0.001 || toBall.normalize().dot(facing) > 0.2)) {
+                    kickBallInDirection(facing, 2.2);
                 }
             }
         }
@@ -2724,7 +2953,7 @@
 
             if (intersects.length > 0) {
                 const intersect = intersects[0];
-                const spawnPos = intersect.point.clone().add(intersect.face.normal.clone().multiplyScalar(2.0));
+                const spawnPos = intersect.point.clone().add(intersect.face.normal.clone().multiplyScalar(1.5));
                 spawnPos.x = Math.round(spawnPos.x / 3) * 3;
                 spawnPos.y = Math.round(spawnPos.y / 3) * 3;
                 spawnPos.z = Math.round(spawnPos.z / 3) * 3;
@@ -2815,19 +3044,6 @@
                         swordMesh.children[0].material.color.setHex(0xFFD700);
                         showNotification('골든 블레이드 스킨을 장착했습니다!');
                     }
-                } else if (itemType === 'diamondsword') {
-                    if (swordMesh) {
-                        swordMesh.children[0].material.color.setHex(0x66E5FF);
-                        swordMesh.children[0].material.emissive = new THREE.Color(0x1AB8D6);
-                        swordMesh.children[0].material.emissiveIntensity = 0.6;
-                        showNotification('다이아몬드 블레이드 스킨을 장착했습니다!');
-                    }
-                } else if (itemType === 'speedboots') {
-                    playerState.speedMultiplier = 1.35;
-                    showNotification('스피드 부츠를 장착했습니다! 이동 속도가 빨라집니다.');
-                } else if (itemType === 'jumpboost') {
-                    playerState.jumpMultiplier = 1.3;
-                    showNotification('슈퍼 점프 부스터를 장착했습니다! 더 높이 점프할 수 있습니다.');
                 }
             } else {
                 showNotification('Robux가 부족합니다!');
@@ -2855,474 +3071,34 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         }
 
-        function escapeHtml(str) {
-            const div = document.createElement('div');
-            div.innerText = str;
-            return div.innerHTML;
-        }
-
         function sendChatMessage(e) {
             e.preventDefault();
             const input = document.getElementById('chat-input');
-            const text = input.value.trim().slice(0, 60);
+            const text = input.value.trim();
             if (text.length > 0) {
                 const chatBox = document.getElementById('chat-messages');
                 const msg = document.createElement('div');
                 msg.className = 'text-white';
-                msg.innerHTML = `<span class="font-bold text-yellow-400">[나]:</span> ${escapeHtml(text)}`;
+                msg.innerHTML = `<span class="font-bold text-yellow-400">[나]:</span> ${text}`;
                 chatBox.appendChild(msg);
                 chatBox.scrollTop = chatBox.scrollHeight;
-
-                // Send to other players first - a rendering hiccup below should never
-                // block the chat message itself from reaching everyone else.
-                if (socket && hasJoinedMultiplayer) socket.emit('chat', { text });
-
-                try {
-                    showLocalSpeechBubble(text);
-                } catch (err) {
-                    console.error('speech bubble render failed:', err);
-                }
-
                 input.value = '';
             }
-        }
-
-        // ---- Multiplayer helper functions ----
-
-        function hashStringToHue(str) {
-            let hash = 0;
-            for (let i = 0; i < str.length; i++) {
-                hash = (hash * 31 + str.charCodeAt(i)) % 360;
-            }
-            return Math.abs(hash);
-        }
-
-        function createNameSprite(text) {
-            const canvas = document.createElement('canvas');
-            canvas.width = 256;
-            canvas.height = 64;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = 'rgba(10, 12, 16, 0.65)';
-            if (ctx.roundRect) {
-                ctx.beginPath();
-                ctx.roundRect(4, 12, 248, 40, 14);
-                ctx.fill();
-            } else {
-                ctx.fillRect(4, 12, 248, 40);
-            }
-            ctx.font = 'bold 28px Fredoka, sans-serif';
-            ctx.fillStyle = '#FFFFFF';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText((text || '플레이어').slice(0, 10), 128, 33);
-
-            const texture = new THREE.CanvasTexture(canvas);
-            const material = new THREE.SpriteMaterial({ map: texture, depthTest: false, transparent: true });
-            const sprite = new THREE.Sprite(material);
-            sprite.scale.set(3.2, 0.8, 1);
-            sprite.position.y = 4.5;
-            sprite.renderOrder = 999;
-            sprite.frustumCulled = false;
-            return sprite;
-        }
-
-        function createSpeechBubbleSprite(text) {
-            const display = text.length > 26 ? text.slice(0, 26) + '…' : text;
-            const canvas = document.createElement('canvas');
-            canvas.width = 512;
-            canvas.height = 160;
-            const ctx = canvas.getContext('2d');
-
-            ctx.font = 'bold 34px Fredoka, sans-serif';
-            const textWidth = ctx.measureText(display).width;
-            const boxWidth = Math.min(492, Math.max(140, textWidth + 70));
-            const boxHeight = 92;
-            const boxX = (512 - boxWidth) / 2;
-            const boxY = 8;
-
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.96)';
-            if (ctx.roundRect) {
-                ctx.beginPath();
-                ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 22);
-                ctx.fill();
-            } else {
-                ctx.fillRect(boxX, boxY, boxWidth, boxHeight);
-            }
-            // Speech bubble tail
-            ctx.beginPath();
-            ctx.moveTo(256 - 16, boxY + boxHeight - 1);
-            ctx.lineTo(256 + 16, boxY + boxHeight - 1);
-            ctx.lineTo(256, boxY + boxHeight + 20);
-            ctx.closePath();
-            ctx.fill();
-
-            ctx.fillStyle = '#15181d';
-            ctx.font = 'bold 34px Fredoka, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(display, 256, boxY + boxHeight / 2 - 4);
-
-            const texture = new THREE.CanvasTexture(canvas);
-            const material = new THREE.SpriteMaterial({ map: texture, depthTest: false, transparent: true });
-            const sprite = new THREE.Sprite(material);
-            const widthScale = THREE.MathUtils.clamp(2.4 + display.length * 0.11, 2.4, 6.5);
-            sprite.scale.set(widthScale, widthScale * (160 / 512), 1);
-            sprite.position.y = 5.7;
-            sprite.renderOrder = 1000;
-            sprite.frustumCulled = false;
-            return sprite;
-        }
-
-        let localSpeechBubble = null;
-        let localSpeechBubbleTimer = null;
-
-        function showLocalSpeechBubble(text) {
-            if (localSpeechBubble) {
-                playerGroup.remove(localSpeechBubble);
-                localSpeechBubble = null;
-            }
-            if (localSpeechBubbleTimer) clearTimeout(localSpeechBubbleTimer);
-            localSpeechBubble = createSpeechBubbleSprite(text);
-            playerGroup.add(localSpeechBubble);
-            localSpeechBubbleTimer = setTimeout(() => {
-                if (localSpeechBubble) {
-                    playerGroup.remove(localSpeechBubble);
-                    localSpeechBubble = null;
-                }
-            }, 4000);
-        }
-
-        function showRemoteSpeechBubble(id, text) {
-            const rp = remotePlayers[id];
-            if (!rp) return;
-            if (rp.speechBubble) {
-                rp.mesh.remove(rp.speechBubble);
-                rp.speechBubble = null;
-            }
-            if (rp.speechBubbleTimer) clearTimeout(rp.speechBubbleTimer);
-            rp.speechBubble = createSpeechBubbleSprite(text);
-            rp.mesh.add(rp.speechBubble);
-            rp.speechBubbleTimer = setTimeout(() => {
-                const current = remotePlayers[id];
-                if (current && current.speechBubble) {
-                    current.mesh.remove(current.speechBubble);
-                    current.speechBubble = null;
-                }
-            }, 4000);
-        }
-
-        function createRemotePlayerMesh(nickname, id) {
-            // createRobloxCharacter() assigns to the shared headMesh/swordMesh globals
-            // as a side effect (used for the local player's hat/sword shop items) -
-            // stash and restore them so building a remote avatar never hijacks the
-            // local player's own head/sword references.
-            const savedHead = headMesh;
-            const savedSword = swordMesh;
-            const body = createRobloxCharacter();
-            headMesh = savedHead;
-            swordMesh = savedSword;
-
-            const hue = hashStringToHue(id + nickname);
-            if (body.children[0] && body.children[0].material) {
-                body.children[0].material = body.children[0].material.clone();
-                body.children[0].material.color.setHSL(hue / 360, 0.55, 0.5);
-            }
-
-            const group = new THREE.Group();
-            group.add(body);
-            group.add(createNameSprite(nickname));
-            return { group, body };
-        }
-
-        function addRemotePlayer(data) {
-            if (!data || data.id === myPlayerId || remotePlayers[data.id]) return;
-            const px = data.pos?.x || 0, py = data.pos?.y ?? 5, pz = data.pos?.z || 0;
-            const { group, body } = createRemotePlayerMesh(data.nickname, data.id);
-            group.position.set(px, py, pz);
-            scene.add(group);
-
-            remotePlayers[data.id] = {
-                mesh: group,
-                body: body,
-                nickname: data.nickname,
-                targetPos: new THREE.Vector3(px, py, pz),
-                targetRotY: data.rotY || 0,
-                lastPos: new THREE.Vector3(px, py, pz),
-                stepCount: 0,
-                swordSwingTimer: 0,
-                speechBubble: null,
-                speechBubbleTimer: null
-            };
-            updateOnlineCountUI();
-        }
-
-        function removeRemotePlayer(id) {
-            const rp = remotePlayers[id];
-            if (!rp) return;
-            if (rp.speechBubbleTimer) clearTimeout(rp.speechBubbleTimer);
-            scene.remove(rp.mesh);
-            delete remotePlayers[id];
-            updateOnlineCountUI();
-        }
-
-        function updateOnlineCountUI() {
-            const el = document.getElementById('online-status-text');
-            if (!el) return;
-            if (!hasJoinedMultiplayer) {
-                el.innerText = '오프라인 (혼자 플레이 중)';
-                return;
-            }
-            const count = Object.keys(remotePlayers).length + 1;
-            el.innerText = `온라인 ${count}/${MAX_ONLINE_PLAYERS}`;
-        }
-
-        function updateRemotePlayers() {
-            for (const id in remotePlayers) {
-                const rp = remotePlayers[id];
-
-                rp.mesh.position.lerp(rp.targetPos, 0.25);
-
-                let diff = rp.targetRotY - rp.mesh.rotation.y;
-                while (diff < -Math.PI) diff += Math.PI * 2;
-                while (diff > Math.PI) diff -= Math.PI * 2;
-                rp.mesh.rotation.y += diff * 0.25;
-
-                const moved = rp.mesh.position.distanceTo(rp.lastPos);
-                rp.lastPos.copy(rp.mesh.position);
-
-                const leftArm = rp.body.getObjectByName('leftArm');
-                const rightArm = rp.body.getObjectByName('rightArm');
-                const leftLeg = rp.body.getObjectByName('leftLeg');
-                const rightLeg = rp.body.getObjectByName('rightLeg');
-
-                if (rp.swordSwingTimer > 0) {
-                    if (rightArm) {
-                        const t = rp.swordSwingTimer / 14;
-                        rightArm.rotation.x = -1.4 + (1 - t) * 2.0;
-                        rightArm.rotation.z = (1 - t) * 0.5;
-                    }
-                    rp.swordSwingTimer--;
-                    if (rp.swordSwingTimer === 0 && rightArm) rightArm.rotation.z = 0;
-                } else if (moved > 0.02 && leftArm && rightArm && leftLeg && rightLeg) {
-                    rp.stepCount += Math.min(moved * 6, 0.5);
-                    leftArm.rotation.x = Math.sin(rp.stepCount) * 0.75;
-                    rightArm.rotation.x = -Math.sin(rp.stepCount) * 0.75;
-                    leftLeg.rotation.x = -Math.sin(rp.stepCount) * 0.75;
-                    rightLeg.rotation.x = Math.sin(rp.stepCount) * 0.75;
-                } else if (leftArm && rightArm && leftLeg && rightLeg) {
-                    leftArm.rotation.x *= 0.7;
-                    rightArm.rotation.x *= 0.7;
-                    leftLeg.rotation.x *= 0.7;
-                    rightLeg.rotation.x *= 0.7;
-                }
-            }
-        }
-
-        function resolveBuiltBlockCollisions() {
-            // The main platform loop only ever snaps a player onto the TOP of a box, so
-            // walking into the side of a block you just placed would otherwise pass
-            // straight through it. This pushes the player back out along whichever
-            // axis has the smaller overlap, but only for blocks actually placed with
-            // the build tool - the hand-authored course geometry is left untouched.
-            const playerBox = new THREE.Box3(
-                new THREE.Vector3(playerState.pos.x - 0.75, playerState.pos.y, playerState.pos.z - 0.75),
-                new THREE.Vector3(playerState.pos.x + 0.75, playerState.pos.y + 3.2, playerState.pos.z + 0.75)
-            );
-            const center = new THREE.Vector3();
-
-            platforms.forEach(plat => {
-                if (!plat.userData || !plat.userData.isPlayerBuilt) return;
-                const box = new THREE.Box3().setFromObject(plat);
-                if (!playerBox.intersectsBox(box)) return;
-
-                // Already standing on top of this block - the vertical snap above
-                // already handles that case, don't also shove the player sideways.
-                if (playerState.pos.y >= box.max.y - 0.05) return;
-
-                const overlapX = Math.min(playerBox.max.x, box.max.x) - Math.max(playerBox.min.x, box.min.x);
-                const overlapZ = Math.min(playerBox.max.z, box.max.z) - Math.max(playerBox.min.z, box.min.z);
-                box.getCenter(center);
-
-                if (overlapX < overlapZ) {
-                    playerState.pos.x += (playerState.pos.x < center.x ? -1 : 1) * overlapX;
-                } else {
-                    playerState.pos.z += (playerState.pos.z < center.z ? -1 : 1) * overlapZ;
-                }
-            });
-        }
-
-        function resolvePlayerCollisions() {
-            // Keeps online players from overlapping one another - each client pushes its
-            // own position away from every nearby player it already knows about, so both
-            // sides of a collision resolve symmetrically without a physics-authoritative server.
-            for (const id in remotePlayers) {
-                const rp = remotePlayers[id];
-                if (!rp || !rp.mesh) continue;
-                const dx = playerState.pos.x - rp.mesh.position.x;
-                const dz = playerState.pos.z - rp.mesh.position.z;
-                const dy = playerState.pos.y - rp.mesh.position.y;
-                if (Math.abs(dy) > 3.5) continue; // different heights/platforms - don't collide
-                const distSq = dx * dx + dz * dz;
-                const minDist = PLAYER_COLLIDE_RADIUS * 2;
-                if (distSq >= minDist * minDist) continue;
-                const dist = Math.sqrt(distSq);
-                if (dist < 0.0001) {
-                    playerState.pos.x += (Math.random() - 0.5) * 0.15;
-                    playerState.pos.z += (Math.random() - 0.5) * 0.15;
-                    continue;
-                }
-                const overlap = minDist - dist;
-                playerState.pos.x += (dx / dist) * overlap * 0.5;
-                playerState.pos.z += (dz / dist) * overlap * 0.5;
-            }
-        }
-
-        function applyIncomingKnockback(dir) {
-            if (!playerKnockback) playerKnockback = new THREE.Vector3();
-            const d = new THREE.Vector3(dir?.x || 0, 0, dir?.z || 0);
-            if (d.lengthSq() < 0.0001) d.set(0, 0, 1);
-            d.normalize();
-            playerKnockback.copy(d.multiplyScalar(2.0));
-            playerState.vel.y = Math.max(playerState.vel.y, 0.22);
-            localHitTimer = 10;
-            audio.playHitSound();
-            const overlay = document.getElementById('flash-overlay');
-            if (overlay) {
-                overlay.classList.add('oof-flash');
-                setTimeout(() => overlay.classList.remove('oof-flash'), 250);
-            }
-            showNotification('다른 플레이어의 검에 맞았습니다!');
-        }
-
-        function sendNetworkState(now) {
-            if (!socket || !hasJoinedMultiplayer || !playerGroup) return;
-            if (now - lastNetworkSendAt < NETWORK_SEND_INTERVAL_MS) return;
-            lastNetworkSendAt = now;
-            socket.emit('state', {
-                pos: { x: playerState.pos.x, y: playerState.pos.y, z: playerState.pos.z },
-                rotY: playerGroup.rotation.y,
-                coins: playerState.coins
-            });
-        }
-
-        function setOnlineStatusMessage(text, isError) {
-            const el = document.getElementById('online-status-text');
-            if (el) el.innerText = text;
-            const msg = document.getElementById('nickname-modal-msg');
-            if (msg && isError) {
-                msg.innerText = text;
-                msg.classList.remove('hidden');
-            }
-        }
-
-        function connectMultiplayer(nickname) {
-            myNickname = nickname;
-            socket = io();
-
-            socket.on('connect', () => {
-                myPlayerId = socket.id;
-                setOnlineStatusMessage('연결됨, 입장 중...', false);
-                socket.emit('join', { nickname: myNickname });
-            });
-
-            socket.on('init', (data) => {
-                hasJoinedMultiplayer = true;
-                document.getElementById('nickname-modal').classList.add('hidden');
-                Object.values(data.players || {}).forEach(p => addRemotePlayer(p));
-                updateOnlineCountUI();
-            });
-
-            socket.on('room-full', () => {
-                hasJoinedMultiplayer = false;
-                setOnlineStatusMessage('서버가 가득 찼습니다 (최대 40명). 잠시 후 다시 시도해주세요.', true);
-                document.getElementById('nickname-modal').classList.remove('hidden');
-            });
-
-            socket.on('player-joined', (data) => {
-                addRemotePlayer(data);
-                showNotification(`${data.nickname}님이 입장했습니다.`);
-            });
-
-            socket.on('player-left', (data) => {
-                if (remotePlayers[data.id]) {
-                    showNotification(`${remotePlayers[data.id].nickname}님이 퇴장했습니다.`);
-                }
-                removeRemotePlayer(data.id);
-            });
-
-            socket.on('player-update', (data) => {
-                const rp = remotePlayers[data.id];
-                if (!rp) return;
-                rp.targetPos.set(data.pos.x, data.pos.y, data.pos.z);
-                rp.targetRotY = data.rotY;
-            });
-
-            socket.on('player-swing', (data) => {
-                const rp = remotePlayers[data.id];
-                if (rp) rp.swordSwingTimer = 14;
-            });
-
-            socket.on('player-chat', (data) => {
-                const rp = remotePlayers[data.id];
-                const nickname = rp ? rp.nickname : (data.nickname || '플레이어');
-                const chatBox = document.getElementById('chat-messages');
-                if (chatBox) {
-                    const msg = document.createElement('div');
-                    msg.className = 'text-blue-300';
-                    msg.innerHTML = `<span class="font-bold text-blue-400">[${escapeHtml(nickname)}]:</span> ${escapeHtml(data.text || '')}`;
-                    chatBox.appendChild(msg);
-                    chatBox.scrollTop = chatBox.scrollHeight;
-                }
-                if (data.text) {
-                    try {
-                        showRemoteSpeechBubble(data.id, data.text);
-                    } catch (err) {
-                        console.error('remote speech bubble render failed:', err);
-                    }
-                }
-            });
-
-            socket.on('hit', (data) => {
-                applyIncomingKnockback(data.dir);
-            });
-
-            socket.on('game-over', (data) => {
-                showGlobalRankingModal(data.ranking, data.winnerNickname);
-            });
-
-            socket.on('disconnect', () => {
-                hasJoinedMultiplayer = false;
-                setOnlineStatusMessage('서버 연결이 끊어졌습니다. 재연결 시도 중...', false);
-            });
-        }
-
-        function joinMultiplayerGame() {
-            const input = document.getElementById('nickname-input');
-            let name = (input.value || '').trim();
-            if (!name) name = '플레이어' + Math.floor(Math.random() * 1000);
-            name = name.slice(0, 10);
-            document.getElementById('nickname-modal-msg').classList.add('hidden');
-            connectMultiplayer(name);
         }
 
         function updatePhysics() {
             if (isSpectating) {
                 // Frozen in spectator mode - the world keeps moving, the player does not
-                updateMovingPlatforms();
                 updateZombies();
                 updateNpcCompanion();
                 updateBullets();
                 updateKnockableBlocks();
                 updateCannonballs();
-                updateRemotePlayers();
-                sendNetworkState(performance.now());
                 return;
             }
 
             const moveSpeed = 0.24 * playerState.speedMultiplier;
             const gravity = -0.019 * playerState.gravityMultiplier * modeGravityScale;
-
-            updateMovingPlatforms();
 
             let inputX = 0;
             let inputZ = 0;
@@ -3380,31 +3156,10 @@
             while (diff > Math.PI) diff -= Math.PI * 2;
             playerGroup.rotation.y += diff * 0.22;
 
-            // Knockback impulse decay (from being hit by another player's sword)
-            if (playerKnockback && playerKnockback.lengthSq() > 0.0004) {
-                playerState.pos.x += playerKnockback.x;
-                playerState.pos.z += playerKnockback.z;
-                playerKnockback.multiplyScalar(0.8);
-            } else if (playerKnockback) {
-                playerKnockback.set(0, 0, 0);
-            }
-
-            // Brief squash animation so a hit is visible on your own character too,
-            // not just on other players' screens
-            if (localHitTimer > 0) {
-                const s = 1 + (localHitTimer / 10) * 0.25;
-                playerMesh.scale.set(0.9 * s, 0.9 * (2 - s), 0.9 * s);
-                localHitTimer--;
-                if (localHitTimer === 0) playerMesh.scale.set(0.9, 0.9, 0.9);
-            }
-
-            // Keep this player from overlapping any other online player
-            resolvePlayerCollisions();
-
             // Jump - grounded only (prevents balloon-mode repeated mid-air jumping)
             if (keys.Space && playerState.isGrounded) {
                 const jumpBoost = (activeGameMode === 'sandbox') ? 1.6 : 1.0;
-                playerState.vel.y = (activeToolSlot === 4 ? 0.38 : 0.44) * jumpBoost * playerState.jumpMultiplier;
+                playerState.vel.y = (activeToolSlot === 4 ? 0.38 : 0.44) * jumpBoost;
                 playerState.isGrounded = false;
                 audio.playJumpSound();
             }
@@ -3432,16 +3187,6 @@
                     }
                 }
             });
-
-            // Ride along with a moving platform instead of sliding off it
-            if (standingPlatform && standingPlatform.userData.isMovingPlatform) {
-                playerState.pos.x += standingPlatform.userData.deltaX || 0;
-            }
-
-            // Side collision for player-built blocks - the top-only check above lets you
-            // land on a block, but walking into its side would otherwise pass straight
-            // through it since nothing else in this engine blocks horizontal movement.
-            resolveBuiltBlockCollisions();
 
             // Sky-Blue Collapsing Tiles - randomly give way the moment they're stepped on
             if (standingPlatform && standingPlatform.userData.isFallTile &&
@@ -3506,6 +3251,13 @@
                 checkZombieFinish();
             }
 
+            // Sports League: ball physics + keep the player on the pitch
+            if (activeGameMode === 'sports') {
+                updateSportsBall();
+                playerState.pos.x = THREE.MathUtils.clamp(playerState.pos.x, -(SPORTS_HALF_W - 1), SPORTS_HALF_W - 1);
+                playerState.pos.z = THREE.MathUtils.clamp(playerState.pos.z, -(SPORTS_HALF_L + 7), SPORTS_HALF_L + 7);
+            }
+
             // Obby Mode Finish Check
             if (activeGameMode === 'obby') {
                 checkObbyFinish();
@@ -3552,19 +3304,8 @@
             const camY = playerState.pos.y + 2.8 + camDistance * Math.sin(camPitch);
             const camZ = playerState.pos.z + camDistance * Math.cos(camYaw) * Math.cos(camPitch);
 
-            const targetCamPos = camVec3.set(camX, camY, camZ);
-            if (!isSpectating && (playerKnockback && playerKnockback.lengthSq() > 0.0004)) {
-                // Let the camera lag slightly behind while being knocked back, so the
-                // sudden displacement actually reads as a recoil instead of being
-                // masked by the camera snapping to the new position instantly.
-                camera.position.lerp(targetCamPos, 0.18);
-            } else {
-                camera.position.copy(targetCamPos);
-            }
+            camera.position.set(camX, camY, camZ);
             camera.lookAt(playerState.pos.x, playerState.pos.y + 2.2, playerState.pos.z);
-
-            updateRemotePlayers();
-            sendNetworkState(performance.now());
         }
 
         function setupMobileControls() {
@@ -3694,7 +3435,6 @@
                     audio.playSwordSlash();
                     triggerSwordSwing();
                     performSwordHit();
-                    if (socket && hasJoinedMultiplayer) socket.emit('swing');
                 } else if (activeToolSlot === 3 && e.button === 0) {
                     handleBuildTool(e);
                 } else if (activeToolSlot === 3 && e.button === 2) {
